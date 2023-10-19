@@ -108,7 +108,7 @@ export function HistoryTable<TData, TValue>({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="rounded-md border">
+      <div className="border rounded-md">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -134,12 +134,15 @@ export function HistoryTable<TData, TValue>({
                 TODO #1: Show a loading indicator when the wallet is loading. Use the provided component.
 
                 -- Loading Component --
-                <TableRow>
+                
+              */
+             isLoading && (
+              <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center">
                     Loading...
                   </TableCell>
                 </TableRow>
-              */
+             )
             }
             {
               /*
@@ -151,12 +154,16 @@ export function HistoryTable<TData, TValue>({
                     message if the wallet is loading.
 
                 -- Not Connected Component --
-                <TableRow>
+                
+              */
+
+                !connected && !isLoading && (
+                  <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center">
                     Connect your wallet to view your history.
                   </TableCell>
                 </TableRow>
-              */
+                )
             }
             {
               /* 
@@ -175,6 +182,13 @@ export function HistoryTable<TData, TValue>({
                   </TableCell>
                 </TableRow>
               */
+             connected && !isLoading && table.getRowModel().rows.length <= 0 && (
+               <TableRow>
+                  <TableCell colSpan={columns.length} className="h-24 text-center">
+                    No data.
+                  </TableCell>
+                </TableRow>
+             )
             }
             {
               /*
@@ -200,11 +214,25 @@ export function HistoryTable<TData, TValue>({
                   ))}
                 </TableRow>
               */
+             connected && !isLoading && table.getRowModel().rows?.length > 0 && (
+              table.getRowModel().rows?.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+             )
             }
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
+      <div className="flex items-center justify-end py-4 space-x-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="outline">

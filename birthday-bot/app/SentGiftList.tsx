@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { sleep } from "@/lib/utils";
+import { Types } from "aptos";
 
 type Gift = {
   address: String;
@@ -40,12 +41,10 @@ type Gift = {
 /*
   List of gifts that the user has sent to others.
 */
-export default function SentGiftList(
-  props: {
-    isTxnInProgress: boolean;
-    setTxn: (isTxnInProgress: boolean) => void;
-  }
-) {
+export default function SentGiftList(props: {
+  isTxnInProgress: boolean;
+  setTxn: (isTxnInProgress: boolean) => void;
+}) {
   // Wallet adapter state
   const { account, connected, signAndSubmitTransaction } = useWallet();
   // Gift list state
@@ -65,17 +64,37 @@ export default function SentGiftList(
 
   /* 
     Retrieves the gifts sent by the user.
-  */  
+  */
   const getGifts = async () => {
     /*
       TODO #2: Validate the account is defined before continuing. If not, return.
     */
-
+    if (!account) {
+      return [];
+    }
     /*
       TODO #3: Make a request to the view function `view_gifters_gifts` to retrieve the gifts sent by 
             the user.
     */
+    const body = {
+      function: `${process.env.MODULE_ADDRESS}::${process.env.MODULE_NAME}::view_gifters_gifts`,
+      type_arguments: [],
+      arguments: [account.address],
+    };
 
+    let result;
+    try {
+      result = await fetch(`https://fullnode.testnet.aptoslabs.com/v1/view`, {
+        method: "POST",
+        body: JSON.stringify(body),
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      });
+    } catch (error) {
+      return [];
+    }
     /* 
       TODO #4: Parse the response from the view request and create the gifts array using the given 
             data. Return the new gifts array.
@@ -83,7 +102,23 @@ export default function SentGiftList(
       HINT:
         - Remember to convert the amount to floating point number
     */
-    return []; // PLACEHOLDER 
+
+    const data = await result.json();
+    let parseData: Gift[] = [];
+    for (let i = 0; i < data[0].length; i++) {
+      let obj: Gift = {
+        address: data[0][i],
+        amount: data[1][i],
+        timestamp: data[2][i],
+      };
+      parseData.push(obj);
+    }
+
+    let sortedData = parseData.sort((a, b) => {
+      return a.timestamp - b.timestamp;
+    });
+
+    return sortedData; // PLACEHOLDER
   };
 
   /*
@@ -93,6 +128,7 @@ export default function SentGiftList(
     /* 
       TODO #6: Set the `isTxnInProgress` state to true.
     */
+    props.setTxn(true);
 
     /* 
       TODO #7: Submit a transaction to the `remove_birthday_gift` entry function to cancel the gift
@@ -102,10 +138,26 @@ export default function SentGiftList(
         - In case of error, set the `isTxnInProgress` state to false and return.
     */
 
+    const payload: Types.TransactionPayload = {
+      type: "entry_function_payload",
+      function: `${process.env.MODULE_ADDRESS}::${process.env.MODULE_NAME}::remove_birthday_gift`,
+      type_arguments: [],
+      arguments: [recipientAddress],
+    };
+    try {
+      const result = await signAndSubmitTransaction(payload);
+      await sleep(
+        parseInt(`${process.env.TRANSACTION_DELAY_MILLISECONDS}` || "0")
+      );
+    } catch (error) {
+      props.setTxn(false);
+      return;
+    }
+
     /*
       TODO #8: Set the `isTxnInProgress` state to false.
     */
-
+    props.setTxn(false);
   };
 
   return (
@@ -113,8 +165,9 @@ export default function SentGiftList(
       <div>
         <CardTitle className="my-2">Gifts sent from you</CardTitle>
         <CardDescription className="break-normal w-96">
-          View all of the unclaimed gifts you have sent to others. You can cancel any of these gifts
-          at any time and the APT will be returned to your wallet.
+          View all of the unclaimed gifts you have sent to others. You can
+          cancel any of these gifts at any time and the APT will be returned to
+          your wallet.
         </CardDescription>
       </div>
       <ScrollArea className="border rounded-lg">
@@ -129,8 +182,7 @@ export default function SentGiftList(
               </TableRow>
             </TableHeader>
             <TableBody>
-              {
-                /* 
+              {/* 
                   TODO #1: If the gifts array is empty, display a table row with a message that the user
                         doesn't have any active gifts. Use the provided components to display the
                         message.
@@ -141,30 +193,44 @@ export default function SentGiftList(
                   -- Component -- 
                   <TableRow>
                     <TableCell colSpan={4}>
-                      <p className="break-normal w-80 text-center">
+                      <p className="text-center break-normal w-80">
                         You don't have any active gifts. Send a gift to someone to get started!
                       </p>
                     </TableCell>
                   </TableRow>
                 */
-              }
-              {
-                /*
+                  gifts.length <= 0 && (
+                    <TableRow>
+                    <TableCell colSpan={4}>
+                      <p className="text-center break-normal w-80">
+                        You don't have any active gifts. Send a gift to someone to get started!
+                      </p>
+                    </TableCell>
+                  </TableRow>
+                  )
+                }
+              {/*
                   TODO #5: Iterate over the gifts array and display each gift in a table row. Use the 
                         provided components to display the gift information.
 
                   -- Components --
-                  <TableRow key={index}>
+                  
+                */
+                  gifts.map((gift, index) => (
+                    <TableRow key={index}>
                     <TableCell className="font-mono">
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger className="underline">
-                            PLACEHOLDER: Display the truncated address of the gift recipient here
-                            HINT: Show the first 6 characters of the address (including 0x), followed by '...', then the last 4 characters of the address
+                            {/* PLACEHOLDER: Display the truncated address of the gift recipient here
+                            HINT: Show the first 6 characters of the address (including 0x), followed by '...', then the last 4 characters of the address */}
+                            {gift?.address.slice(0, 5)}...
+                            {gift?.address.slice(-4)}
                           </TooltipTrigger>
                           <TooltipContent>
                             <p>
-                              PLACEHOLDER: Display the full address of the gift sender here
+                              {/* PLACEHOLDER: Display the full address of the gift sender here */}
+                              {gift.address}
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -174,17 +240,31 @@ export default function SentGiftList(
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger className="underline">
-                            PLACEHOLDER: Show the release date of the gift here
+                            {/* PLACEHOLDER: Show the release date of the gift here
                             HINT: 
                               - Convert the timestamp to a Date object and use the toLocaleDateString() method to format the date
-                              - Note that the timestamp from Aptos is in seconds, but not milliseconds
+                              - Note that the timestamp from Aptos is in seconds, but not milliseconds */}
+                              {new Date(gift.timestamp * 1000).toLocaleDateString(
+                              "en-GB",
+                              {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                              }
+                            )}
                           </TooltipTrigger>
                           <TooltipContent>
                             <p>
-                              PLACEHOLDER: Show the release date and time of the gift here
+                              {/* PLACEHOLDER: Show the release date and time of the gift here
                               HINT: 
                                 - Convert the timestamp to a Date object and use the toLocaleString() method to format the date and time
-                                - Note that the timestamp from Aptos is in seconds, but not milliseconds
+                                - Note that the timestamp from Aptos is in seconds, but not milliseconds */}
+                                {new Date(
+                                gift.timestamp * 1000
+                              ).toLocaleString('en-GB', {
+                                timeZone:"Europe/London",
+                                hour12:false,
+                              })}
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -194,13 +274,15 @@ export default function SentGiftList(
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger className="underline">
-                            PLACEHOLDER: Show the gift amount in APT here (rounded to 2 decimal places)
-                            HINT: Remember to show the unit of the amount (APT) after the amount
+                            {/* PLACEHOLDER: Show the gift amount in APT here (rounded to 2 decimal places)
+                            HINT: Remember to show the unit of the amount (APT) after the amount */}
+                             {`${(gift.amount / 100000000).toFixed(2)} APT`}
                           </TooltipTrigger>
                           <TooltipContent>
                             <p>
-                              PLACEHOLDER: Show the gift amount in APT here (rounded to 8 decimal places)
-                              HINT: Remember to show the unit of the amount (APT) after the amount
+                              {/* PLACEHOLDER: Show the gift amount in APT here (rounded to 8 decimal places)
+                              HINT: Remember to show the unit of the amount (APT) after the amount */}
+                               {`${(gift.amount / 100000000).toFixed(8)} APT`}
                             </p>
                           </TooltipContent>
                         </Tooltip>
@@ -210,7 +292,7 @@ export default function SentGiftList(
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button size="sm" variant="destructive">
-                            <X className="h-4 w-4" />
+                            <X className="w-4 h-4" />
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
@@ -223,12 +305,15 @@ export default function SentGiftList(
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger className="underline">
-                                    PLACEHOLDER: Display the truncated address of the gift sender here
-                                    HINT: Show the first 6 characters of the address (including 0x), followed by '...', then the last 4 characters of the address
+                                    {/* PLACEHOLDER: Display the truncated address of the gift sender here
+                                    HINT: Show the first 6 characters of the address (including 0x), followed by '...', then the last 4 characters of the address */}
+                                     {gift?.address.slice(0, 5)}...
+                            {gift?.address.slice(-4)}
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p>
-                                      PLACEHOLDER: Display the full address of the gift sender here
+                                      {/* PLACEHOLDER: Display the full address of the gift sender here */}
+                                       {gift.address}
                                     </p>
                                   </TooltipContent>
                                 </Tooltip>
@@ -236,12 +321,14 @@ export default function SentGiftList(
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger className="underline">
-                                    PLACEHOLDER: Show the gift amount in APT here (rounded to 2 decimal places)
-                                    HINT: Remember to show the unit of the amount (APT) after the amount
+                                    {/* PLACEHOLDER: Show the gift amount in APT here (rounded to 2 decimal places)
+                                    HINT: Remember to show the unit of the amount (APT) after the amount */}
+                                     {`${(gift.amount / 100000000).toFixed(2)} APT`}
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p>
-                                      PLACEHOLDER: Show the gift amount in APT here (rounded to 8 decimal places)
+                                      {/* PLACEHOLDER: Show the gift amount in APT here (rounded to 8 decimal places) */}
+                                      {`${(gift.amount / 100000000).toFixed(8)} APT`}
                                     </p>
                                   </TooltipContent>
                                 </Tooltip>
@@ -251,7 +338,9 @@ export default function SentGiftList(
                           <AlertDialogFooter>
                             <AlertDialogCancel>Nevermind</AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={() => {console.log("PLACEHOLDER: Call the cancelGift function here")}}
+                              onClick={() => {
+                                cancelGift(gift.address)
+                              }}
                             >
                               Continue
                             </AlertDialogAction>
@@ -260,8 +349,9 @@ export default function SentGiftList(
                       </AlertDialog>
                     </TableCell>
                   </TableRow>
-                */
-              }
+                  ))
+                }
+
             </TableBody>
           </Table>
         </div>

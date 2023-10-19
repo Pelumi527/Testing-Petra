@@ -25,17 +25,13 @@ import { useEffect, useState } from "react";
   a supported wallet is installed, the user can click the connect button to connect the wallet. If
   the wallet is not installed, the user can click the install button to install the wallet.
 */
-export default function WalletSelector(
-  props: {
-    isTxnInProgress?: boolean;
-  }
-) {
-
-  // wallet state variables 
-  const { connect, account, connected, disconnect, wallets, isLoading } = useWallet();
+export default function WalletSelector(props: { isTxnInProgress?: boolean }) {
+  // wallet state variables
+  const { connect, account, connected, disconnect, wallets, isLoading } =
+    useWallet();
   // State to hold the current account's APT balance. In string - floating point format.
   const [balance, setBalance] = useState<string | undefined>(undefined);
-
+ 
   /* 
     Gets the balance of the connected account whenever the connected, account, and isTxnInProgress
     variables change.
@@ -63,20 +59,49 @@ export default function WalletSelector(
           balance to "0".
 
     */
+    const body = {
+      function: "0x1::coin::balance",
+      type_arguments: ["0x1::aptos_coin::AptosCoin"],
+      arguments: [address],
+    };
+
+    let result;
+    try {
+      result = await fetch(`https://fullnode.testnet.aptoslabs.com/v1/view`, {
+        method: "POST",
+        body: JSON.stringify(body),
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      });
+    } catch (error) {
+      setBalance("0");
+      return;
+    }
+
+    const data = await result.json();
+
+    setBalance((data / 100000000).toLocaleString());
+  };
+
+  const handleDisconnect = () => {
+    disconnect();
   };
 
   return (
-    <div>
-      {!connected && !isLoading && (
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>Connect Wallet</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Connect your wallet</DialogTitle>
-              {
-                /* 
+    <>
+      <div>
+        {!connected && !isLoading && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button>Connect Wallet</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Connect your wallet</DialogTitle>
+                {
+                  /* 
                   TODO #1: Return a list of all supported wallets. If the wallet is installed, display
                   a button to connect the wallet. If the wallet is not installed, display a button 
                   to install the wallet. 
@@ -91,7 +116,7 @@ export default function WalletSelector(
                   -- Connect Wallet Component --
                   <div
                     key={wallet.name}
-                    className="flex w-fulls items-center justify-between rounded-xl p-2"
+                    className="flex items-center justify-between p-2 w-fulls rounded-xl"
                   >
                     <h1>PLACEHOLDER: Wallet Name</h1>
                     <Button variant="secondary" onClick={() => console.log("PLACEHOLDER: Connect wallet")}>
@@ -102,7 +127,7 @@ export default function WalletSelector(
                   -- Install Wallet Component --
                   <div
                     key={wallet.name}
-                    className="flex w-fulls items-center justify-between rounded-xl p-2"
+                    className="flex items-center justify-between p-2 w-fulls rounded-xl"
                   >
                     <h1>PLACEHOLDER: Wallet Name</h1>
                     <a href="PLACEHOLDER.com" target="_blank">
@@ -112,13 +137,41 @@ export default function WalletSelector(
                     </a>
                   </div>
                 */
-              }
-            </DialogHeader>
-          </DialogContent>
-        </Dialog>
-      )}
-      {
-        /* 
+                  <div>
+                    {wallets.map((wallet) =>
+                      wallet.readyState == WalletReadyState.Installed ? (
+                        <div
+                          key={wallet.name}
+                          className="flex items-center justify-between p-2 w-fulls rounded-xl"
+                        >
+                          <h1> {wallet.name}</h1>
+                          <Button
+                            variant="secondary"
+                            onClick={() => connect(wallet.name)}
+                          >
+                            Connect
+                          </Button>
+                        </div>
+                      ) : (
+                        <div
+                          key={wallet.name}
+                          className="flex items-center justify-between p-2 w-fulls rounded-xl"
+                        >
+                          <h1>{wallet.name}</h1>
+                          <a href={wallet.url} target="_blank">
+                            <Button variant="secondary">Install</Button>
+                          </a>
+                        </div>
+                      )
+                    )}
+                  </div>
+                }
+              </DialogHeader>
+            </DialogContent>
+          </Dialog>
+        )}
+        {
+          /* 
           TODO #4: Display a loading button if the wallet is currently loading
 
           HINT: 
@@ -130,9 +183,13 @@ export default function WalletSelector(
             Loading...
           </Button>
         */
-      }
-      {
-        /* 
+          isLoading && (
+            <Button variant="secondary" disabled>
+              Loading...
+            </Button>
+          )
+        }
+        {/* 
           TODO #2: Display the wallet's APT balance and address if the wallet is connected and the 
                 account is defined. Use the component below to display the wallet's APT balance and 
                 address, as well as provide the disconnect button. 
@@ -158,8 +215,31 @@ export default function WalletSelector(
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        */
-      }
-    </div>
+        */}
+      </div>
+      <div>
+        {connected && account && (
+          <div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="font-mono">
+                  {balance} | {account.address.slice(0, 5)}...
+                  {account.address.slice(-4)}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem
+                  onClick={() => {
+                    handleDisconnect();
+                  }}
+                >
+                  Disconnect
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
